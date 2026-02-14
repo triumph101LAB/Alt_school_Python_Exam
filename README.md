@@ -6,7 +6,7 @@ A RESTful API built with **FastAPI** for managing a simple school enrollment sys
 
 ## 📋 Features
 * **Users:** Register and retrieve students and administrators.
-* **Courses:** Admins can create and delete courses. Everyone can view them.
+* **Courses:** Admins can create, update and delete courses. Everyone can view them.
 * **Enrollments:** Students can enroll in courses and deregister. Admins can view enrollments and force deregistration.
 * **Security:** Role-based access control (Admin vs. Student).
 * **Storage:** In-memory dictionary database (resets on server restart).
@@ -33,6 +33,7 @@ A RESTful API built with **FastAPI** for managing a simple school enrollment sys
     ```
 2.  Open your browser and visit the interactive documentation:
     * **Swagger UI:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+3 The You can test the various endpoint/functionalities on the on the swagger UI
     
 
 ### Default Test Data
