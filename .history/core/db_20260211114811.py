@@ -1,0 +1,3 @@
+books = {}
+users = {}
+enrollment = {}

@@ -1,0 +1,10 @@
+from fastapi import FastAPI
+from routers.course import course_router
+from routers.enrollment import enr
+app = FastAPI(
+    title=
+)
+
+@app.get("/")
+def root():
+    return {"message":"Hello world, this is my fist launch of my fast API project"}
