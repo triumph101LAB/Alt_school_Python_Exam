@@ -1,65 +1,57 @@
 from fastapi import HTTPException, status
-from schemas.course import CourseBase, Course
-from core.db import courses as courses_db
-from schemas.user import UserRole,User
+from sqlalchemy.orm import Session
+from repository.course import CourseRepository
+from schemas.course import CourseResponse
+
 
 class CourseService:
-    
-    @staticmethod
-    def create_course(course_in: CourseBase):
-        for existing_course in courses_db.values():
-            if existing_course.code == course_in.code:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Course code must be unique"
-                )
+    def __init__(self, db: Session):
+        self.repo = CourseRepository(db)
 
-        course_id = 1
-        if courses_db:
-            course_id = max(courses_db.keys()) + 1
+    def get_active_courses(self) -> list[CourseResponse]:
+        courses = self.repo.get_all_active()
+        return [CourseResponse.model_validate(c) for c in courses]
 
-        new_course = Course(
-            id=course_id,
-            **course_in.model_dump()
-        )
-        courses_db[course_id] = new_course
-        return new_course
-    
-    @staticmethod
-    def get_courses():
-
-        return list(courses_db.values())
-    
-    @staticmethod
-    def get_course(course_id: int):
-        course = courses_db.get(course_id)
+    def get_course(self, course_id: int) -> CourseResponse:
+        course = self.repo.get_by_id(course_id)
         if not course:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Course not found"
             )
-        return course
-    @staticmethod
-    def update_course(course_id: int, course_update: CourseBase):
-        # 1. Existence Check
-        if course_id not in courses_db:
+        return CourseResponse.model_validate(course)
+
+    def create_course(self, title, code, capacity) -> CourseResponse:
+        if self.repo.get_by_code(code):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Course with code '{code}' already exists"
+            )
+        course = self.repo.create(title, code, capacity)
+        return CourseResponse.model_validate(course)
+
+    def update_course(self, course_id: int, data: dict) -> CourseResponse:
+        course = self.repo.get_by_id(course_id)
+        if not course:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Course not found"
             )
-        current_course = courses_db[course_id]
-        if course_update.code != current_course.code:
-            for id, course in courses_db.items():
-                if course.code == course_update.code and id != course_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Course code must be unique"
-                    )
-        current_course.title = course_update.title
-        current_course.code = course_update.code
-        return current_course
-        
-    @staticmethod
-    def delete_course(course_id: int):
-        del courses_db[course_id]
+        if "code" in data and data["code"] != course.code:
+            if self.repo.get_by_code(data["code"]):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Course with code '{data['code']}' already exists"
+                )
+        updated = self.repo.update(course, **data)
+        return CourseResponse.model_validate(updated)
+
+    def delete_course(self, course_id: int) -> dict:
+        course = self.repo.get_by_id(course_id)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course not found"
+            )
+        self.repo.delete(course)
         return {"detail": "Course deleted successfully"}

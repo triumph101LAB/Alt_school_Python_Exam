@@ -1,3 +1,0 @@
-books = {}
-courses = {}
-enrollment = {}

@@ -1,8 +1,14 @@
 from pydantic import BaseModel
+from datetime import datetime
 
-class EnrollmentBase(BaseModel):
-    user_id:int
+class EnrollmentCreate(BaseModel):
+    
     course_id:int
     
-class Enrollment(EnrollmentBase):
+class EnrollmentResponse(BaseModel):
     id:int
+    user_id:int
+    course_id:int
+    created_at:datetime
+    
+    model_config = {"from_attributes":True}

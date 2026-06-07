@@ -1,80 +1,76 @@
-from schemas.enrollment import Enrollment, EnrollmentBase
-from core.db import users, courses,enrollments
-from schemas.user import User,UserRole
-
 from fastapi import HTTPException, status
-class EnrollmentService:
-    @staticmethod
-    def enroll_course(enroll_in: EnrollmentBase, student: User): # Added student param if you need it
+from sqlalchemy.orm import Session
+from repository.enrollment import EnrollmentRepository
+from repository.course import CourseRepository
+from schemas.enrollment import EnrollmentResponse
 
-        if enroll_in.user_id not in users:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        if enroll_in.course_id not in courses:
+
+class EnrollmentService:
+    def __init__(self, db: Session):
+        self.repo = EnrollmentRepository(db)
+        self.course_repo = CourseRepository(db)
+
+    def enroll(self, user_id: int, course_id: int) -> EnrollmentResponse:
+        course = self.course_repo.get_by_id(course_id)
+        if not course:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Course not found"
-            )    
-        for enrollment in enrollments.values():
-            if enrollment.user_id == enroll_in.user_id and enrollment.course_id == enroll_in.course_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Student is already registered"
-                )
-        enrollment_id = 1
-        if enrollments:
-            enrollment_id = max(enrollments.keys()) + 1
-        new_enrollment = Enrollment(
-            id=enrollment_id,
-            user_id=enroll_in.user_id,
-            course_id=enroll_in.course_id
-        )
-        enrollments[enrollment_id] = new_enrollment  
-        return new_enrollment
- 
-    @staticmethod
-
-    def deregister(enrollment_id: int, user: User): 
-        if enrollment_id not in enrollments:
-             raise HTTPException(status_code=404, detail="Enrollment not found")
-        
-        enrollment = enrollments[enrollment_id]
-        if user.role == UserRole.STUDENT and enrollment.user_id != user.id:
-            raise HTTPException(
-                status_code=403, 
-                detail="You can only deregister from your own courses."
             )
+        if not course.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot enroll in an inactive course"
+            )
+        if self.repo.get_by_user_and_course(user_id, course_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Already enrolled in this course"
+            )
+        if self.repo.count_by_course(course_id) >= course.capacity:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Course is at full capacity"
+            )
+        enrollment = self.repo.create(user_id, course_id)
+        return EnrollmentResponse.model_validate(enrollment)
 
-        del enrollments[enrollment_id]
-        return {"message": "Deregistered successfully"}  
-    @staticmethod
-    def get_all_enrollment():
-        return enrollments
-    @staticmethod
-    def get_course_enrollment(course_id:int):
-        if course_id not in courses:
+    def deregister(self, enrollment_id: int, user_id: int) -> dict:
+        enrollment = self.repo.get_by_id(enrollment_id)
+        if not enrollment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail= "Course not found"
-            ) 
-        matching_enrollment = []
-        for enrollment in enrollments.values():
-           if (enrollment.course_id == course_id):
-               matching_enrollment.append(enrollment)
-        return matching_enrollment       
-               
-    @staticmethod
-    def student_enrollment(user_id:int):
-        if user_id not in users:
-            raise HTTPException(
-              status_code= status.HTTP_404_NOT_FOUND,
-              detail = "User not found"  
+                detail="Enrollment not found"
             )
-        courses_enrolled = []
-        for enrollment in enrollments.values():
-            if(enrollment.user_id == user_id):
-                courses_enrolled.append(enrollment)
-        return courses_enrolled    
-                    
+        if enrollment.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only deregister from your own enrollments"
+            )
+        self.repo.delete(enrollment)
+        return {"detail": "Successfully deregistered"}
+
+    def get_all(self) -> list[EnrollmentResponse]:
+        return [EnrollmentResponse.model_validate(e) for e in self.repo.get_all()]
+
+    def get_by_course(self, course_id: int) -> list[EnrollmentResponse]:
+        course = self.course_repo.get_by_id(course_id)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course not found"
+            )
+        return [EnrollmentResponse.model_validate(e) for e in self.repo.get_by_course(course_id)]
+
+    def get_by_student(self, user_id: int) -> list[EnrollmentResponse]:
+        return [EnrollmentResponse.model_validate(e) for e in self.repo.get_by_user(user_id)]
+
+    def admin_remove(self, enrollment_id: int) -> dict:
+        enrollment = self.repo.get_by_id(enrollment_id)
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Enrollment not found"
+            )
+        self.repo.delete(enrollment)
+        return {"detail": "Student removed from course"}

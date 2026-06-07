@@ -1,33 +1,38 @@
-from fastapi import APIRouter, status,Depends
-from services.deps import is_student_user, is_admin_user
-from schemas.enrollment import EnrollmentBase
-from schemas.user import User
-
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.orm import Session
+from core.db import get_db
 from services.enrollment import EnrollmentService
+from services.deps import require_admin, require_student
+from schemas.enrollment import EnrollmentCreate, EnrollmentResponse
 
 enrollment_router = APIRouter()
 
 
-@enrollment_router.post("/", status_code = status.HTTP_201_CREATED)
-def enroll_course(enrollIn:EnrollmentBase, student : User = Depends(is_student_user)):
-    return EnrollmentService.enroll_course(enrollIn,student)
+@enrollment_router.get("/me", response_model=list[EnrollmentResponse])
+def my_enrollments(db: Session = Depends(get_db), current_user=Depends(require_student)):
+    return EnrollmentService(db).get_by_student(current_user.id)
 
-@enrollment_router.get("/")
-def get_enrollment(admin : User =  Depends(is_admin_user)):
-    return EnrollmentService.get_all_enrollment()
+
+@enrollment_router.get("/", response_model=list[EnrollmentResponse])
+def get_all_enrollments(db: Session = Depends(get_db), _=Depends(require_admin)):
+    return EnrollmentService(db).get_all()
+
+
+@enrollment_router.get("/course/{course_id}", response_model=list[EnrollmentResponse])
+def get_course_enrollments(course_id: int, db: Session = Depends(get_db), _=Depends(require_admin)):
+    return EnrollmentService(db).get_by_course(course_id)
+
+
+@enrollment_router.post("/", response_model=EnrollmentResponse, status_code=status.HTTP_201_CREATED)
+def enroll(data: EnrollmentCreate, db: Session = Depends(get_db), current_user=Depends(require_student)):
+    return EnrollmentService(db).enroll(current_user.id, data.course_id)
+
+
+@enrollment_router.delete("/admin/{enrollment_id}")
+def admin_remove(enrollment_id: int, db: Session = Depends(get_db), _=Depends(require_admin)):
+    return EnrollmentService(db).admin_remove(enrollment_id)
+
 
 @enrollment_router.delete("/{enrollment_id}")
-def deregister_course(enrollment_id:int, student: User = Depends(is_student_user)):
-    return EnrollmentService.deregister(enrollment_id,student)
-
-@enrollment_router.get("/student/{student_id}")
-def get_enrolled_courses(student_id:int, student:User = Depends(is_student_user)):
-    return EnrollmentService.student_enrollment(student_id)
-
-@enrollment_router.get("/course/{courseId}")
-def get_course_enrollment(courseId:int, admin :User = Depends(is_admin_user)):
-    return EnrollmentService.get_course_enrollment(courseId)
-
-@enrollment_router.delete("/force/{enrollment_id}")
-def force_deregister_course(enrollment_id:int, admin: User = Depends(is_admin_user)):
-    return EnrollmentService.deregister(enrollment_id,admin)
+def deregister(enrollment_id: int, db: Session = Depends(get_db), current_user=Depends(require_student)):
+    return EnrollmentService(db).deregister(enrollment_id, current_user.id)

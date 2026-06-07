@@ -6,9 +6,16 @@ class UserRole(str, Enum):
     STUDENT = "student"
     
 class UserBase(BaseModel):
-    username: str
+    name: str
+    password:str
     email: EmailStr
-    role: UserRole 
+    role: UserRole = UserRole.STUDENT 
 
-class User(UserBase):
-    id:int       
+class UserResponse(BaseModel):
+    id:int
+    name:str
+    role:UserRole
+    is_active:bool
+    
+    model_config = {"from_attributes":True}
+              

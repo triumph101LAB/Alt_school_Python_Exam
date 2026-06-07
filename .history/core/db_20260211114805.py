@@ -1,3 +1,0 @@
-books = {}
-users = {}
-en
