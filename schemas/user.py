@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr
 from enum import Enum
 
 class UserRole(str, Enum):
-    ADMIN = "administrator"
+    ADMIN = "admin"
     STUDENT = "student"
     
 class UserBase(BaseModel):
