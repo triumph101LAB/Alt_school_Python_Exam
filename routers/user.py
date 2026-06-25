@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from core.db import get_db
 from services.user import UserService
 from services.deps import get_current_user
-from schemas.user import UserBase, UserResponse
+from schemas.user import UserBase, UserResponse,UserLogin
 
 user_router = APIRouter()
 
@@ -19,7 +19,7 @@ def register(data: UserBase, db: Session = Depends(get_db)):
 
 
 @user_router.post("/login")
-def login(data: UserBase, db: Session = Depends(get_db)):
+def login(data: UserLogin, db: Session = Depends(get_db)):
     return UserService(db).login(
         email=data.email,
         password=data.password

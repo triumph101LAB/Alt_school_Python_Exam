@@ -10,6 +10,9 @@ class UserBase(BaseModel):
     password:str
     email: EmailStr
     role: UserRole = UserRole.STUDENT 
+class UserLogin(BaseModel):     
+    email: EmailStr
+    password: str
 
 class UserResponse(BaseModel):
     id:int
